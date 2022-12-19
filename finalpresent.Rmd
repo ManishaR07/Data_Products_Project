@@ -1,0 +1,99 @@
+---
+title: "Untitled"
+author: "Manisha Rana"
+date: "`r Sys.Date()`"
+output: ioslides_presentation
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Preicting Ozone(Parts Per billion) from Solar.R(Wind(miles per hour)) using Linear Regression in ShinyApp. We have two models to predict that and we can chose which model we want to see. We have checkboxes to choose either of the models or only one model
+
+## Creating ui.R file to get the input and output from the model
+
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+    titlePanel("Predict Ozone from Solar.R"),
+    sidebarLayout(
+        sidebarPanel(
+            sliderInput("sliderSolaR","What is the Solar Radiation value?",7,334,value=200),
+            checkboxInput("showModel1","Show/Hide Model 1",value=TRUE),
+            checkboxInput("showModel2","Show/hide Model 2",value=TRUE)
+        ),
+        mainPanel(
+            plotOutput("plot1"),
+            h3("Predicted Ozone from Model 1:"),
+            textOutput("pred1"),
+            h3("Predicted Ozone from Model 2:"),
+            textOutput("pred2")
+        )
+    )
+
+)
+```
+
+## Creating Server.R to process the data using the input value of Solar.R variable in airquality dataset, run models and get the output prediction for Ozone.
+
+```{r}
+library(shiny)
+
+server <- function(input,output){
+    airquality$solarsp <- ifelse(airquality$Solar.R - 200>0,airquality$Solar.R - 200,0)
+    model1 <- lm(Ozone~Solar.R,data=airquality)
+    model2 <- lm(Ozone ~ solarsp+Solar.R,data=airquality)
+    
+    model1pred <- reactive({
+        SolarInput <- input$sliderSolaR
+        predict(model1,newdata=data.frame(Solar.R=SolarInput))
+    })
+    
+    model2pred <- reactive({
+        SolarInput <- input$sliderSolaR
+        predict(model2,newdata =
+                    data.frame(Solar.R = SolarInput,
+                               solarsp = ifelse(SolarInput - 200 >0,SolarInput-200,0)))
+        
+    })
+    
+    output$plot1 <- renderPlot({
+        SolarInput <- input$sliderSolaR
+        
+        plot(airquality$Solar.R,airquality$Ozone,xlab="Wind(Miles per Hour)",
+             ylab="Ozone(ppb)",bty="n",pch=16,
+             xlim=c(7,334),ylim=c(0,200))
+        if(input$showModel1){
+            abline(model1,col="red",lwd=2)
+        }
+        if(input$showModel2){
+            model2lines <- predict(model2,newdata=data.frame(
+                Solar.R=7:334,solarsp=ifelse(7:334-200>0,7:334-200,0)
+            ))
+            lines(7:334,model2lines,col="blue",lwd=2)
+        }
+        legend(0,200,c("Model1 Prediction","Model2 Prediction"),pch=16,
+               col=c("red","blue"),bty="n",cex=1.2)
+        points(SolarInput,model1pred(),col="red",pch=16,cex=2)
+        points(SolarInput,model2pred(),col="blue",pch=16,cex=2)
+    })
+    
+    output$pred1<-renderText({
+        model1pred()
+    })
+    
+    output$pred2 <- renderText({
+        model2pred()
+    })
+}
+
+```
+
+## Output of the model
+
+```{r}
+shinyApp(ui = ui, server = server)
+```
